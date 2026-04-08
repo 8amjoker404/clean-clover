@@ -4,6 +4,7 @@ const pool = require('../config/db');
 const verifyToken = require('../middleware/authMiddleware');
 const isAdmin = require('../middleware/adminMiddleware');
 
+//create /api/mission/create
 router.post('/create', verifyToken, isAdmin, async (req, res) => {
   const {
     title,
@@ -49,7 +50,7 @@ router.post('/create', verifyToken, isAdmin, async (req, res) => {
     });
   }
 });
-
+//list /api/mission/list
 router.get('/list', verifyToken, async (req, res) => {
   const userId = req.user.id;
 
@@ -88,7 +89,7 @@ router.get('/list', verifyToken, async (req, res) => {
     });
   }
 });
-
+//start /api/mission/start
 router.post('/start', verifyToken, async (req, res) => {
   const userId = req.user.id;
   const { missionId } = req.body;
