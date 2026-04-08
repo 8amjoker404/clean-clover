@@ -24,9 +24,13 @@ router.post('/turn', async (req, res) => {
     if (userRows.length === 0) return res.status(404).json({ error: "User not found" });
     const user = userRows[0];
 
-    // 2. Check if they are already cracked / dead
-    if (user.is_cracked) {
-      return res.status(400).json({ error: "Your Grimoire is cracked! Visit a healer before fighting." });
+    // 2. Limit Break trigger: once HP is at or below 15%, enter cracked state
+    if (Number(user.hp) <= Number(user.max_hp) * 0.15 && !user.is_cracked) {
+      await pool.query(
+        `UPDATE users SET is_cracked = 1 WHERE id = ?`,
+        [userId]
+      );
+      user.is_cracked = 1;
     }
 
     // 3. Fetch Ally if requested (The AI Clone system)
@@ -43,7 +47,8 @@ router.post('/turn', async (req, res) => {
 
     // 4. Ask the AI to simulate the clash
     const prompt = getCombatPrompt(user, enemyState, action, ally);
-    const aiResponseText = await generateAIResponse(prompt);
+    const aiData = await generateAIResponse(prompt);
+    const aiResponseText = aiData.text || '';
 
     // 5. Parse the JSON out of the AI's response text
     // The AI returns text + a markdown JSON block. We extract the JSON.
@@ -62,11 +67,24 @@ router.post('/turn', async (req, res) => {
     const narrativeOnly = aiResponseText.replace(/```json\n[\s\S]*?\n```/, '').trim();
 
     // 6. Calculate New Stats
-    let newHp = Math.max(0, user.hp - (mathData.playerDamageTaken || 0));
-    let newMp = Math.max(0, user.mp - (mathData.playerMpUsed || 0));
-    let newEnemyHp = Math.max(0, enemyState.hp - (mathData.enemyDamageTaken || 0));
+    const incomingDamage = Math.max(0, Number(mathData.playerDamageTaken) || 0);
+    const skillCost = Math.max(0, Number(mathData.playerMpUsed) || 0);
+    const outgoingDamageBase = Math.max(0, Number(mathData.enemyDamageTaken) || 0);
+    const crackedActive = Boolean(user.is_cracked);
+    const outgoingDamage = crackedActive ? outgoingDamageBase * 2 : outgoingDamageBase;
+
+    let newHp = Math.max(0, Number(user.hp) - incomingDamage);
+    let newMp = Number(user.mp);
+    let newEnemyHp = Math.max(0, Number(enemyState.hp) - outgoingDamage);
+
+    // In cracked state, skills cost HP instead of MP
+    if (crackedActive) {
+      newHp = Math.max(0, newHp - skillCost);
+    } else {
+      newMp = Math.max(0, Number(user.mp) - skillCost);
+    }
     
-    let isCracked = false;
+    let isCracked = crackedActive;
     let newMaxMp = user.max_mp;
 
     // THE PENALTY: Grimoire Crack (Option B)
