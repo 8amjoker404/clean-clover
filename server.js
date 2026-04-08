@@ -10,6 +10,7 @@ const examRoutes = require('./routes/exam');
 const combatRoutes = require('./routes/combat'); 
 const leaderboardRoutes = require('./routes/leaderboard');
 const squadRoutes = require('./routes/squad');
+const missionRoutes = require('./routes/mission');
 const verifyToken = require('./middleware/authMiddleware');
 
 const app = express();
@@ -26,6 +27,7 @@ app.use('/api/exam', verifyToken, examRoutes);
 app.use('/api/combat', verifyToken, combatRoutes);
 app.use('/api/leaderboard', verifyToken, leaderboardRoutes);
 app.use('/api/squad', verifyToken, squadRoutes);
+app.use('/api/mission', missionRoutes);
 
 app.get('/', (req, res) => {
   res.send('Clover Soul API is online and secured!');

@@ -1,0 +1,24 @@
+ALTER TABLE users 
+ADD COLUMN role VARCHAR(20) DEFAULT 'player';
+
+CREATE TABLE IF NOT EXISTS missions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(100) NOT NULL,
+  description TEXT NOT NULL,
+  difficulty VARCHAR(50) DEFAULT 'D-Rank',
+  rank_required INT DEFAULT 1000,
+  yul_reward INT DEFAULT 0,
+  merit_reward INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS active_missions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  mission_id INT NOT NULL,
+  status VARCHAR(50) DEFAULT 'in_progress',
+  current_enemy_hp INT DEFAULT 100,
+  started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (mission_id) REFERENCES missions(id) ON DELETE CASCADE
+);

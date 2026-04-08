@@ -1,39 +1,110 @@
 // utils/prompts.js
 
 // 1. The Entrance Exam Prompt
-const getExamPrompt = (playerContext, userAction) => {
-  const stage = Number(playerContext.tutorial_stage) || 1;
-
-  return `
-You are the AI Game Master for a text-based Black Clover RPG called "Clover Soul".
-Stay in character and narrate dramatically.
-
-Player Context:
-- Grimoire Element: ${playerContext.magic_type}
-- Current Trial: Stage ${stage} of 3
-- Player Stats: HP ${playerContext.hp}, MP ${playerContext.mp}
-- Player Action: "${userAction}"
-
-Stage Rules:
-- Stage 1 (Target): Evaluate action accuracy against a target dummy.
-- Stage 2 (Defense): The Grimoire must glow and awaken new magic. You MUST invent a new spell name based on the player's element.
-  Example: Light -> "Light Refraction".
-- Stage 3 (The Duel): Narrate a high-stakes finale duel and evaluate final performance.
-
-Output Rules (MANDATORY):
-1) Write a strong narrative first.
-2) Then output ONE strict JSON block wrapped in \`\`\`json ... \`\`\` with this exact schema:
-{
+const getExamPrompt = (playerContext, userAction, context = {}) => {
+  const stage = Number(context.stage) || Number(playerContext.tutorial_stage) || 1;
+  const magicType = playerContext.magic_type || 'Magic';
+  const hasUnlockedSpell = Boolean(context.hasUnlockedSpell);
+  const history = Array.isArray(context.history) ? context.history.slice(0, 3) : [];
+  const trialName = stage === 1 ? 'TRIAL 1 - THE DUMMY' : stage === 2 ? 'TRIAL 2 - THE SURVIVAL' : 'TRIAL 3 - THE DUEL';
+  const stageRules = stage === 1
+    ? `TRIAL 1 REQUIREMENTS:
+- This is target practice.
+- The player uses a basic ${magicType}-based spell attack (example for Light: Light Bolt).
+- Narrate the Captains watching from the balcony.
+- Narrate the spell streaking across the field and smashing or shattering the dummy.
+- Use exactly 10 MP.
+- No grade.
+- No new spell unlock.`
+    : stage === 2
+      ? `TRIAL 2 REQUIREMENTS:
+- The player must dodge, block, or deflect bronze discs.
+- Mid-trial, the Grimoire MUST glow and flip open to a new page.
+- This trial MUST unlock a new defensive spell themed to ${magicType} magic.
+- Example for Light: Light Refraction.
+- Return the new defensive spell in "newSpell".
+- Grade must be empty.`
+      : `TRIAL 3 REQUIREMENTS:
+- The player fights a rival NPC in a 1v1 duel.
+- Evaluate whether the player fought cleverly.
+- Especially reward combo usage, such as using defensive magic creatively before striking.
+- Return a final grade of A, B, or C.
+- Rival must end as defeated with rivalStatus = "defeated".
+- No new spell unlock.`;
+  const stageJsonSchema = stage === 1
+    ? `{
+  "playerDamageTaken": 0,
+  "playerMpUsed": 10,
+  "grade": "",
+  "newSpell": "",
+  "rivalStatus": ""
+}`
+    : stage === 2
+      ? `{
+  "playerDamageTaken": 0,
+  "playerMpUsed": number,
+  "grade": "",
+  "newSpell": "generated defensive spell name",
+  "rivalStatus": ""
+}`
+      : `{
   "playerDamageTaken": number,
   "playerMpUsed": number,
   "grade": "A|B|C",
-  "newSpell": "Name"
-}
-3) Stage-specific constraints:
-- Stage 1: "newSpell" should be an empty string.
-- Stage 2: "newSpell" must be non-empty and themed to ${playerContext.magic_type}.
-- Stage 3: "grade" must be exactly A, B, or C.
-4) Never omit the JSON block.
+  "newSpell": "",
+  "rivalStatus": "defeated"
+}`;
+
+  const previousActions = history
+    .map((item) => `- Stage ${Number(item.stage) || '?'}: "${item.action || ''}"`)
+    .join('\n');
+  const recentNarrative = history
+    .map((item) => `- "${(item.narrative || '').toString().trim()}"`)
+    .join('\n');
+  const memorySection = history.length > 0
+    ? `
+The following is the player's recent history. Use it to maintain continuity. Do not repeat identical narration. Build upon previous events.
+
+Previous Actions:
+${previousActions}
+
+Recent Narrative:
+${recentNarrative}
+`
+    : '';
+
+  return `
+You are a Black Clover universe entrance examiner and narrator.
+Stay strictly in-universe and narrate dramatically.
+
+Player Context:
+- Grimoire Element: ${magicType}
+- Current Trial: ${trialName}
+- Player Stats: HP ${playerContext.hp}, MP ${playerContext.mp}
+- Player Action: "${userAction}"
+- Defensive Spell Already Unlocked: ${hasUnlockedSpell ? 'Yes' : 'No'}
+
+Global Narrative Rules:
+- Always include the Magic Knight Captains observing from the balcony.
+- Make the scene cinematic and focused on this exact trial only.
+- Do not skip the trial's required beats.
+
+${memorySection}
+
+${stageRules}
+
+Output Rules (MANDATORY):
+1) Write a strong narrative first.
+2) Then output ONE strict JSON block wrapped in \`\`\`json ... \`\`\`.
+3) The JSON keys must be exactly:
+- "playerDamageTaken"
+- "playerMpUsed"
+- "grade"
+- "newSpell"
+- "rivalStatus"
+4) For this trial, the JSON must match this exact shape:
+${stageJsonSchema}
+5) Never omit the JSON block.
 `;
 };
   

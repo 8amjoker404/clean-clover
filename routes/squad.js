@@ -5,6 +5,7 @@ const { getSquadWelcomePrompt } = require('../utils/prompts');
 const { generateAIResponse } = require('../services/llm');
 const moment = require('moment');
 
+//join /api/squad/join 
 router.post('/join', async (req, res) => {
   const userId = req.user.id;
   const { squadId } = req.body;
@@ -17,7 +18,7 @@ router.post('/join', async (req, res) => {
   try {
     const [rows] = await pool.query(
       `
-      SELECT u.id, u.username, u.tutorial_stage, g.magic_type
+      SELECT u.id, u.username, u.tutorial_stage, u.squad_id, g.magic_type
       FROM users u
       LEFT JOIN grimoires g ON g.user_id = u.id
       WHERE u.id = ?
@@ -30,6 +31,35 @@ router.post('/join', async (req, res) => {
     }
 
     const user = rows[0];
+    if (user.squad_id) {
+      return res.status(409).json({ error: 'You have already joined a squad.' });
+    }
+
+    const [examRows] = await pool.query(
+      `
+      SELECT grade, available_squads
+      FROM exam_results
+      WHERE user_id = ?
+      LIMIT 1
+      `,
+      [userId]
+    );
+
+    if (examRows.length === 0 || !examRows[0].grade) {
+      return res.status(403).json({ error: 'You must finish the entrance exam first.' });
+    }
+
+    let allowedSquads = [];
+    try {
+      allowedSquads = JSON.parse(examRows[0].available_squads || '[]');
+    } catch (e) {
+      allowedSquads = [];
+    }
+
+    if (!Array.isArray(allowedSquads) || !allowedSquads.includes(chosenSquadId)) {
+      return res.status(403).json({ error: 'This squad is not available for your exam result.' });
+    }
+
     if (Number(user.tutorial_stage) !== 999) {
       return res.status(403).json({ error: 'You must finish the entrance exam first.' });
     }

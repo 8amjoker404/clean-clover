@@ -6,7 +6,7 @@ const pool = require('../config/db');
 
 const router = express.Router();
 
-// Helper: Roll Grimoire from the Databases
+// Helper: Roll Grimoire from the Database
 const rollGrimoire = async () => {
   const [rows] = await pool.query('SELECT element_name FROM grimoire_elements');
   
